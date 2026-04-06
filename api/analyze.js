@@ -20,22 +20,10 @@ export default async function handler(req, res) {
 
     const data = await response.json();
 
-    let result = "No result";
-
-    // 🔥 MÉTODO DEFINITIVO (recorre toda la respuesta)
-    if (data.output && Array.isArray(data.output)) {
-      for (const item of data.output) {
-        if (item.content && Array.isArray(item.content)) {
-          for (const content of item.content) {
-            if (content.text) {
-              result = content.text;
-              break;
-            }
-          }
-        }
-        if (result !== "No result") break;
-      }
-    }
+    // 🔥 MÉTODO DEFINITIVO UNIVERSAL
+    let result = data.output_text 
+      || JSON.stringify(data).match(/"text":"(.*?)"/)?.[1] 
+      || "No result";
 
     res.status(200).json({ result });
 
