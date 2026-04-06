@@ -22,13 +22,20 @@ export default async function handler(req, res) {
 
     let result = "No result";
 
-    if (data.output && data.output.length > 0) {
-      result = data.output[0].content[0].text;
+    // ✅ Manejo correcto de la respuesta (SOLUCIÓN)
+    if (data.output_text) {
+      result = data.output_text;
+    } else if (data.output && data.output.length > 0) {
+      const content = data.output[0].content;
+      if (content && content.length > 0 && content[0].text) {
+        result = content[0].text;
+      }
     }
 
     res.status(200).json({ result });
 
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: "Server error" });
   }
 }
