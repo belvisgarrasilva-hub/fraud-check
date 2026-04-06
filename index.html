@@ -140,7 +140,7 @@ async function analyze() {
 
   try {
 
-    let res = await fetch("https://fraud-check-psi.vercel.app/api/analyze", {
+    let res = await fetch("/api/analyze", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -150,8 +150,14 @@ async function analyze() {
 
     let data = await res.json();
 
+    console.log("API RESPONSE:", data); // 🔥 DEBUG
+
     document.getElementById("fvScore").innerText = "AI";
-    document.getElementById("fvLabel").innerText = data.result;
+
+    // 🔥 SOLUCIÓN DEFINITIVA
+    let resultText = data.result || data.output_text || JSON.stringify(data);
+
+    document.getElementById("fvLabel").innerText = resultText;
 
     let fill = document.getElementById("fvFill");
     fill.style.background = "#16a34a";
