@@ -17,26 +17,31 @@ export default async function handler(req, res) {
         messages: [
           {
             role: "system",
-            content: "You are a scam detection AI. Answer only: scam, suspicious or safe."
+            content: "You detect scams. Answer ONLY one word: scam, suspicious, or safe."
           },
           {
             role: "user",
             content: text
           }
         ],
-        max_tokens: 20
+        temperature: 0
       })
     });
 
     const data = await response.json();
 
-    const result =
-      data.choices?.[0]?.message?.content || "No result";
+    console.log("OPENAI RESPONSE:", JSON.stringify(data, null, 2));
+
+    let result = "No result";
+
+    if (data.choices && data.choices.length > 0) {
+      result = data.choices[0].message.content.trim();
+    }
 
     res.status(200).json({ result });
 
   } catch (error) {
-    console.error(error);
+    console.error("ERROR:", error);
     res.status(500).json({ error: "Server error" });
   }
 }
