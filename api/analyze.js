@@ -16,19 +16,29 @@ export default async function handler(req, res) {
         model: "gpt-4o-mini",
         messages: [
           {
+            role: "system",
+            content: "Classify the message as scam, suspicious, or safe. Answer in one short phrase."
+          },
+          {
             role: "user",
             content: text
           }
-        ]
+        ],
+        temperature: 0
       })
     });
 
     const data = await response.json();
 
-    // 🔥 MOSTRAR TODO LO QUE DEVUELVE OPENAI
-    res.status(200).json(data);
+    let result = "No result";
+
+    if (data.choices && data.choices.length > 0) {
+      result = data.choices[0].message.content.trim();
+    }
+
+    res.status(200).json({ result });
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Server error" });
   }
 }
