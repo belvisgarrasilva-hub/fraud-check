@@ -15,30 +15,17 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: "gpt-4o-mini",
         messages: [
-          {
-            role: "system",
-            content: "Classify the message as scam, suspicious, or safe. Answer in one short phrase."
-          },
-          {
-            role: "user",
-            content: text
-          }
-        ],
-        temperature: 0
+          { role: "user", content: text }
+        ]
       })
     });
 
     const data = await response.json();
 
-    let result = "No result";
-
-    if (data.choices && data.choices.length > 0) {
-      result = data.choices[0].message.content.trim();
-    }
-
-    res.status(200).json({ result });
+    // 🔥 DEVOLVER TODO (sin filtrar)
+    return res.status(200).json(data);
 
   } catch (error) {
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: error.message });
   }
 }
