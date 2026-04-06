@@ -1,8 +1,4 @@
 export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
-
   const { text } = req.body;
 
   try {
@@ -14,21 +10,16 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: "gpt-4.1-mini",
-        input: `Analyze this message and say if it's scam, suspicious or safe. Answer in one short sentence:\n\n${text}`
+        input: text
       })
     });
 
     const data = await response.json();
 
-    // 🔥 MÉTODO DEFINITIVO UNIVERSAL
-    let result = data.output_text 
-      || JSON.stringify(data).match(/"text":"(.*?)"/)?.[1] 
-      || "No result";
-
-    res.status(200).json({ result });
+    // 🔥 DEVOLVEMOS TODO PARA VERLO
+    res.status(200).json({ debug: data });
 
   } catch (error) {
-    console.error(error);
     res.status(500).json({ error: "Server error" });
   }
 }
