@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI Fraud Checker</title>
+
+<style>
+
+body {
+  background: #f5f7fa;
+}
+
+.fv-app {
+  max-width: 640px;
+  margin: 60px auto;
+  padding: 25px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+  font-family: Arial;
+}
+
+.fv-title {
+  font-size: 22px;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.fv-sub {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 20px;
+}
+
+.fv-input {
+  width: 100%;
+  height: 120px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #ddd;
+  resize: none;
+}
+
+.fv-btn {
+  width: 100%;
+  margin-top: 12px;
+  padding: 14px;
+  background: #111;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.fv-result {
+  margin-top: 20px;
+  padding: 20px;
+  border-radius: 12px;
+  background: #fafafa;
+  display: none;
+  text-align: center;
+}
+
+.fv-score {
+  font-size: 42px;
+  font-weight: bold;
+}
+
+.fv-bar {
+  height: 10px;
+  border-radius: 5px;
+  background: #eee;
+  margin: 15px 0;
+  overflow: hidden;
+}
+
+.fv-fill {
+  height: 100%;
+  width: 0%;
+  transition: width 1s ease;
+}
+
+.fv-label {
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.fv-loading {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #666;
+}
+
+</style>
+
+</head>
+<body>
+
+<div class="fv-app">
+
+  <div class="fv-title">Check suspicious content</div>
+  <div class="fv-sub">Paste a link, email or message and get an instant analysis</div>
+
+  <textarea id="fvInput" class="fv-input" placeholder="Paste here..."></textarea>
+
+  <button class="fv-btn" onclick="analyze()">Analyze Now</button>
+
+  <div id="fvResult" class="fv-result">
+
+    <div id="fvScore" class="fv-score"></div>
+
+    <div class="fv-bar">
+      <div id="fvFill" class="fv-fill"></div>
+    </div>
+
+    <div id="fvLabel" class="fv-label"></div>
+
+    <div id="fvDetails"></div>
+
+    <div class="fv-loading">⚡ AI scan completed</div>
+
+  </div>
+
+</div>
+
+<script>
+
+async function analyze() {
+
+  let input = document.getElementById("fvInput").value;
+  let result = document.getElementById("fvResult");
+
+  if (!input) return;
+
+  result.style.display = "block";
+
+  document.getElementById("fvScore").innerText = "⏳";
+  document.getElementById("fvLabel").innerText = "Analyzing...";
+
+  try {
+
+    let res = await fetch("https://TU-APP.vercel.app/api/analyze", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ text: input })
+    });
+
+    let data = await res.json();
+
+    document.getElementById("fvScore").innerText = "AI";
+    document.getElementById("fvLabel").innerText = data.result;
+
+    let fill = document.getElementById("fvFill");
+    fill.style.background = "#16a34a";
+    fill.style.width = "100%";
+
+    document.getElementById("fvDetails").innerHTML = `
+      - AI content analysis<br>
+      - Scam detection<br>
+      - Risk evaluation
+    `;
+
+  } catch (e) {
+
+    document.getElementById("fvLabel").innerText = "Error connecting to AI";
+
+  }
+
+}
+
+</script>
+
+</body>
+</html>
