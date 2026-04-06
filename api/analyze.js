@@ -22,13 +22,18 @@ export default async function handler(req, res) {
 
     let result = "No result";
 
-    // ✅ Manejo correcto de la respuesta (SOLUCIÓN)
-    if (data.output_text) {
-      result = data.output_text;
-    } else if (data.output && data.output.length > 0) {
-      const content = data.output[0].content;
-      if (content && content.length > 0 && content[0].text) {
-        result = content[0].text;
+    // 🔥 MÉTODO DEFINITIVO (recorre toda la respuesta)
+    if (data.output && Array.isArray(data.output)) {
+      for (const item of data.output) {
+        if (item.content && Array.isArray(item.content)) {
+          for (const content of item.content) {
+            if (content.text) {
+              result = content.text;
+              break;
+            }
+          }
+        }
+        if (result !== "No result") break;
       }
     }
 
