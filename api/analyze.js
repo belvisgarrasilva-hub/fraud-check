@@ -6,38 +6,32 @@ export default async function handler(req, res) {
   const { text } = req.body;
 
   try {
-    const response = await fetch("https://api.openai.com/v1/responses", {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "gpt-4.1-mini",
-        input: `Analyze this message and classify it as scam, suspicious or safe in one short sentence:\n\n${text}`
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: "You are a scam detection AI. Answer only: scam, suspicious or safe."
+          },
+          {
+            role: "user",
+            content: text
+          }
+        ],
+        max_tokens: 20
       })
     });
 
     const data = await response.json();
 
-    let result = "No result";
-
-    // ✅ Lectura correcta de la respuesta
-    if (data.output_text) {
-      result = data.output_text;
-    } else if (data.output && Array.isArray(data.output)) {
-      for (const item of data.output) {
-        if (item.content && Array.isArray(item.content)) {
-          for (const content of item.content) {
-            if (content.text) {
-              result = content.text;
-              break;
-            }
-          }
-        }
-        if (result !== "No result") break;
-      }
-    }
+    const result =
+      data.choices?.[0]?.message?.content || "No result";
 
     res.status(200).json({ result });
 
