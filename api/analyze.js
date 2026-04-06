@@ -1,5 +1,4 @@
 export default async function handler(req, res) {
-
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -7,7 +6,6 @@ export default async function handler(req, res) {
   const { text } = req.body;
 
   try {
-
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
@@ -16,13 +14,17 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: "gpt-4.1-mini",
-        input: `Analyze if this text is scam or safe. Answer short:\n\n${text}`
+        input: `Analyze this message and say if it's scam, suspicious or safe. Answer in one short sentence:\n\n${text}`
       })
     });
 
     const data = await response.json();
 
-    const result = data.output?.[0]?.content?.[0]?.text || "No result";
+    let result = "No result";
+
+    if (data.output && data.output.length > 0) {
+      result = data.output[0].content[0].text;
+    }
 
     res.status(200).json({ result });
 
