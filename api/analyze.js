@@ -1,20 +1,40 @@
 export default function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "*");
 
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
 
+  // 🔥 ACEPTA GET TAMBIÉN (CLAVE)
+  if (req.method === "GET") {
+    return res.status(200).json({
+      score: 80,
+      verdict: "Seguro",
+      details: "API funcionando (GET test)"
+    });
+  }
+
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+    return res.status(200).json({
+      score: 50,
+      verdict: "Error",
+      details: "Método no válido pero controlado"
+    });
   }
 
   try {
-    const body = typeof req.body === "string"
-      ? JSON.parse(req.body)
-      : req.body;
+    let body = req.body;
+
+    // 🔥 Soporta todos los formatos posibles
+    if (typeof body === "string") {
+      try {
+        body = JSON.parse(body);
+      } catch {
+        body = { text: body };
+      }
+    }
 
     const input = body?.text || "";
 
@@ -29,8 +49,8 @@ export default function handler(req, res) {
       verdict = "Peligroso";
       details = "Posible phishing detectado";
     } else if (
-      text.includes("cuenta") ||
       text.includes("banco") ||
+      text.includes("cuenta") ||
       text.includes("verify")
     ) {
       score = 40;
