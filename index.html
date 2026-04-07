@@ -1,10 +1,7 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>AI Fraud Checker</title>
-
-<style>
+<title>AI Fraud Checker</title><style>
 
 body {
   background: #f5f7fa;
@@ -92,55 +89,35 @@ body {
   color: #666;
 }
 
-</style>
+</style></head>
+<body><div class="fv-app">  <div class="fv-title">🔍 AI Fraud Checker</div>
+  <div class="fv-sub">Analyze text or links to detect scams</div>  <textarea id="input" class="fv-input" placeholder="Paste a message or link..."></textarea><button class="fv-btn" onclick="analyze()">Analyze</button>
 
-</head>
-<body>
-
-<div class="fv-app">
-
-  <div class="fv-title">Check suspicious content</div>
-  <div class="fv-sub">Paste a link, email or message and get an instant analysis</div>
-
-  <textarea id="fvInput" class="fv-input" placeholder="Paste here..."></textarea>
-
-  <button class="fv-btn" onclick="analyze()">Analyze Now</button>
-
-  <div id="fvResult" class="fv-result">
-
-    <div id="fvScore" class="fv-score"></div>
-
-    <div class="fv-bar">
-      <div id="fvFill" class="fv-fill"></div>
-    </div>
-
-    <div id="fvLabel" class="fv-label"></div>
-
-    <div id="fvDetails"></div>
-
-    <div class="fv-loading">⚡ AI scan completed</div>
-
-  </div>
-
+  <div class="fv-loading" id="loading" style="display:none;">
+    Analyzing with AI...
+  </div>  <div class="fv-result" id="resultBox">
+    <div class="fv-label" id="label"></div><div class="fv-bar">
+  <div class="fv-fill" id="bar"></div>
 </div>
 
-<script>
+<div class="fv-score" id="score"></div>
 
+<div id="details" style="margin-top:10px;font-size:14px;color:#555;"></div>
+
+  </div></div><script>
 async function analyze() {
+  const input = document.getElementById("input").value.trim();
 
-  let input = document.getElementById("fvInput").value;
-  let result = document.getElementById("fvResult");
+  if (!input) {
+    alert("Enter text or a link");
+    return;
+  }
 
-  if (!input) return;
-
-  result.style.display = "block";
-
-  document.getElementById("fvScore").innerText = "⏳";
-  document.getElementById("fvLabel").innerText = "Analyzing...";
+  document.getElementById("loading").style.display = "block";
+  document.getElementById("resultBox").style.display = "none";
 
   try {
-
-    let res = await fetch("/api/analyze", {
+    const res = await fetch("/api/analyze", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -148,36 +125,41 @@ async function analyze() {
       body: JSON.stringify({ text: input })
     });
 
-    let data = await res.json();
+    const data = await res.json();
 
-    console.log("API RESPONSE:", data); // 🔥 DEBUG
+    document.getElementById("loading").style.display = "none";
+    document.getElementById("resultBox").style.display = "block";
 
-    document.getElementById("fvScore").innerText = "AI";
+    let result = (data.result || "").toLowerCase();
 
-    // 🔥 SOLUCIÓN DEFINITIVA
-    let resultText = data.result || data.output_text || JSON.stringify(data);
+    let score = 0;
+    let label = "";
+    let color = "";
 
-    document.getElementById("fvLabel").innerText = resultText;
+    if (result.includes("scam")) {
+      score = 90;
+      label = "⚠️ Scam detected";
+      color = "#ff4d4d";
+    } else if (result.includes("suspicious")) {
+      score = 60;
+      label = "⚠️ Suspicious";
+      color = "#ffaa00";
+    } else {
+      score = 10;
+      label = "✅ Safe";
+      color = "#00c853";
+    }
 
-    let fill = document.getElementById("fvFill");
-    fill.style.background = "#16a34a";
-    fill.style.width = "100%";
+    document.getElementById("label").innerText = label;
+    document.getElementById("score").innerText = score + "%";
+    document.getElementById("bar").style.width = score + "%";
+    document.getElementById("bar").style.background = color;
 
-    document.getElementById("fvDetails").innerHTML = `
-      - AI content analysis<br>
-      - Scam detection<br>
-      - Risk evaluation
-    `;
+    document.getElementById("details").innerText = data.result;
 
-  } catch (e) {
-
-    document.getElementById("fvLabel").innerText = "Error connecting to AI";
-
+  } catch (err) {
+    document.getElementById("loading").innerText = "Error analyzing";
   }
-
 }
-
-</script>
-
-</body>
+</script></body>
 </html>
