@@ -1,10 +1,14 @@
-<!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>AI Fraud Checker</title><style>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Detector de Fraude con IA</title>
 
+<style>
 body {
   background: #f5f7fa;
+  margin: 0;
 }
 
 .fv-app {
@@ -50,6 +54,10 @@ body {
   cursor: pointer;
 }
 
+.fv-btn:hover {
+  background: #333;
+}
+
 .fv-result {
   margin-top: 20px;
   padding: 20px;
@@ -72,94 +80,153 @@ body {
   overflow: hidden;
 }
 
-.fv-fill {
+.fv-bar-fill {
   height: 100%;
   width: 0%;
-  transition: width 1s ease;
+  transition: 0.5s;
 }
 
-.fv-label {
-  font-weight: bold;
-  margin-bottom: 10px;
-}
+.safe { color: green; }
+.warning { color: orange; }
+.danger { color: red; }
 
-.fv-loading {
-  margin-top: 10px;
+.fv-history {
+  margin-top: 20px;
   font-size: 13px;
-  color: #666;
+  color: #444;
+  text-align: left;
 }
+</style>
+</head>
 
-</style></head>
-<body><div class="fv-app">  <div class="fv-title">🔍 AI Fraud Checker</div>
-  <div class="fv-sub">Analyze text or links to detect scams</div>  <textarea id="input" class="fv-input" placeholder="Paste a message or link..."></textarea><button class="fv-btn" onclick="analyze()">Analyze</button>
+<body>
 
-  <div class="fv-loading" id="loading" style="display:none;">
-    Analyzing with AI...
-  </div>  <div class="fv-result" id="resultBox">
-    <div class="fv-label" id="label"></div><div class="fv-bar">
-  <div class="fv-fill" id="bar"></div>
+<div class="fv-app">
+  <div class="fv-title">🛡 Detector de fraude con IA</div>
+  <div class="fv-sub">Pegá un mensaje, email o enlace sospechoso</div>
+
+  <textarea class="fv-input" placeholder="Ej: https://paypal-login.com"></textarea>
+
+  <button class="fv-btn" onclick="analizar()">Analizar ahora</button>
+
+  <div class="fv-result">
+    <div class="fv-score" id="score">0%</div>
+
+    <div class="fv-bar">
+      <div class="fv-bar-fill" id="barFill"></div>
+    </div>
+
+    <div id="veredicto"></div>
+    <div id="details"></div>
+  </div>
+
+  <div class="fv-history" id="history"></div>
 </div>
 
-<div class="fv-score" id="score"></div>
+<script>
+const API_URL = "https://TU-PROYECTO.vercel.app/api/analyze"; // 🔥 CAMBIAR
 
-<div id="details" style="margin-top:10px;font-size:14px;color:#555;"></div>
+async function analizar() {
+  const text = document.querySelector(".fv-input").value.trim();
 
-  </div></div><script>
-async function analyze() {
-  const input = document.getElementById("input").value.trim();
-
-  if (!input) {
-    alert("Enter text or a link");
+  if (!text) {
+    alert("Pegá algo para analizar");
     return;
   }
 
-  document.getElementById("loading").style.display = "block";
-  document.getElementById("resultBox").style.display = "none";
-
   try {
-    const res = await fetch("/api/analyze", {
+    const res = await fetch(API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ text: input })
+      body: JSON.stringify({ text })
     });
 
     const data = await res.json();
 
-    document.getElementById("loading").style.display = "none";
-    document.getElementById("resultBox").style.display = "block";
+    mostrarResultado(data);
+    guardarHistorial(text, data.score);
 
-    let result = (data.result || "").toLowerCase();
-
-    let score = 0;
-    let label = "";
-    let color = "";
-
-    if (result.includes("scam")) {
-      score = 90;
-      label = "⚠️ Scam detected";
-      color = "#ff4d4d";
-    } else if (result.includes("suspicious")) {
-      score = 60;
-      label = "⚠️ Suspicious";
-      color = "#ffaa00";
-    } else {
-      score = 10;
-      label = "✅ Safe";
-      color = "#00c853";
-    }
-
-    document.getElementById("label").innerText = label;
-    document.getElementById("score").innerText = score + "%";
-    document.getElementById("bar").style.width = score + "%";
-    document.getElementById("bar").style.background = color;
-
-    document.getElementById("details").innerText = data.result;
-
-  } catch (err) {
-    document.getElementById("loading").innerText = "Error analyzing";
+  } catch (error) {
+    mostrarError(error);
   }
 }
-</script></body>
+
+function mostrarResultado(data) {
+  const resultBox = document.querySelector(".fv-result");
+  const scoreEl = document.getElementById("score");
+  const bar = document.getElementById("barFill");
+  const veredicto = document.getElementById("veredicto");
+  const details = document.getElementById("details");
+
+  resultBox.style.display = "block";
+
+  if (!data || !data.score) {
+    scoreEl.innerText = "0%";
+    veredicto.innerText = "Error de análisis";
+    return;
+  }
+
+  scoreEl.innerText = data.score + "%";
+  bar.style.width = data.score + "%";
+
+  if (data.score > 70) {
+    bar.style.background = "green";
+    veredicto.className = "safe";
+    veredicto.innerText = "✔ Seguro";
+  } else if (data.score > 40) {
+    bar.style.background = "orange";
+    veredicto.className = "warning";
+    veredicto.innerText = "⚠ Sospechoso";
+  } else {
+    bar.style.background = "red";
+    veredicto.className = "danger";
+    veredicto.innerText = "❌ Peligroso";
+  }
+
+  details.innerText = data.details || "";
+}
+
+function mostrarError(error) {
+  const resultBox = document.querySelector(".fv-result");
+  const veredicto = document.getElementById("veredicto");
+
+  resultBox.style.display = "block";
+  veredicto.innerText = "Error de conexión con el servidor";
+}
+
+function guardarHistorial(text, score) {
+  let historial = JSON.parse(localStorage.getItem("historial")) || [];
+
+  historial.unshift({
+    text,
+    score
+  });
+
+  historial = historial.slice(0, 5);
+
+  localStorage.setItem("historial", JSON.stringify(historial));
+
+  mostrarHistorial();
+}
+
+function mostrarHistorial() {
+  const historyDiv = document.getElementById("history");
+  let historial = JSON.parse(localStorage.getItem("historial")) || [];
+
+  historyDiv.innerHTML = "<b>Historial:</b><br>";
+
+  historial.forEach(item => {
+    historyDiv.innerHTML += `
+      <div>${item.text.substring(0, 30)}... → ${item.score}%</div>
+    `;
+  });
+}
+
+// cargar historial al iniciar
+mostrarHistorial();
+</script>
+
+</body>
 </html>
