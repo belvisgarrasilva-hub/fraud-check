@@ -1,4 +1,15 @@
 export default async function handler(req, res) {
+
+  // ✅ CORS (necesario para Blogger)
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  // ✅ Manejo preflight
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -25,7 +36,6 @@ export default async function handler(req, res) {
         );
         const data = await response.json();
 
-        // Limpiar HTML
         content = data.contents
           .replace(/<[^>]*>?/gm, "")
           .slice(0, 3000);
@@ -47,7 +57,7 @@ export default async function handler(req, res) {
         messages: [
           {
             role: "system",
-            content: "Detect scams, phishing or fraud. Answer briefly: scam, suspicious or safe and why."
+            content: "Detect scams, phishing or fraud. Respond with: scam, suspicious or safe + short reason."
           },
           {
             role: "user",
@@ -60,8 +70,12 @@ export default async function handler(req, res) {
 
     const data = await aiResponse.json();
 
+    // ✅ Manejo de error real de OpenAI
     if (!data.choices) {
-      return res.status(500).json({ error: "AI response error", data });
+      return res.status(500).json({
+        error: "OpenAI error",
+        details: data
+      });
     }
 
     const result = data.choices[0].message.content.trim();
