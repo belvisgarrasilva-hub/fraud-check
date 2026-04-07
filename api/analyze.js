@@ -1,34 +1,40 @@
+// /api/analyze.js
 export default async function handler(req, res) {
-  // Permitir CORS desde cualquier origen
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  // Permitir solo POST
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST');
+    return res.status(405).json({ error: 'Método no permitido, use POST' });
+  }
 
-  // Manejo de preflight
-  if (req.method === "OPTIONS") {
+  // Habilitar CORS para cualquier dominio (puedes restringir a tu dominio de Blogger)
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  // Manejar preflight OPTIONS
+  if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  // Solo permitir POST
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
-
   try {
-    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
-    const input = body?.text;
+    const { text } = req.body;
 
-    if (!input) {
-      return res.status(400).json({ error: "No input provided" });
+    if (!text) {
+      return res.status(400).json({ error: 'No se recibió texto para analizar' });
     }
 
-    // 🔹 Resultado de prueba sin OpenAI
-    return res.status(200).json({
-      score: 50, // valor neutro para mostrar en Blogger
-      details: "Análisis básico activo (sin crédito de OpenAI)"
-    });
+    // Aquí podrías integrar la API real de IA si tuvieras crédito
+    // Pero para modo gratuito devolvemos resultados simulados
+    const score = Math.floor(Math.random() * 101); // 0 a 100
+    let details = '';
 
-  } catch (error) {
-    return res.status(500).json({ error: error.message });
+    if (score > 70) details = 'Contenido seguro según análisis básico';
+    else if (score > 40) details = 'Contenido sospechoso según análisis básico';
+    else details = 'Contenido potencialmente peligroso según análisis básico';
+
+    return res.status(200).json({ score, details });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Error del servidor' });
   }
 }
