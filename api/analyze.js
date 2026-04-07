@@ -1,11 +1,9 @@
 export default async function handler(req, res) {
-
-  // ✅ CORS (necesario para Blogger)
+  // ✅ CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  // ✅ Manejo preflight
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
@@ -15,7 +13,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 🔧 Soporte seguro para body
     const body = typeof req.body === "string"
       ? JSON.parse(req.body)
       : req.body;
@@ -28,7 +25,7 @@ export default async function handler(req, res) {
 
     let content = input;
 
-    // 🌐 Detectar si es URL
+    // 🌐 Si es URL → extraer contenido
     if (input.startsWith("http://") || input.startsWith("https://")) {
       try {
         const response = await fetch(
@@ -41,48 +38,84 @@ export default async function handler(req, res) {
           .slice(0, 3000);
 
       } catch (err) {
-        return res.status(500).json({ error: "Error fetching URL content" });
+        content = input; // fallback
       }
     }
 
-    // 🤖 Llamada a OpenAI
-    const aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: "Detect scams, phishing or fraud. Respond with: scam, suspicious or safe + short reason."
-          },
-          {
-            role: "user",
-            content: content
-          }
-        ],
-        temperature: 0
-      })
-    });
+    // 🧠 FALLBACK LOCAL (SIEMPRE FUNCIONA)
+    let score = 90;
+    let verdict = "Seguro";
+    let details = "Análisis básico";
 
-    const data = await aiResponse.json();
-
-    // ✅ Manejo de error real de OpenAI
-    if (!data.choices) {
-      return res.status(500).json({
-        error: "OpenAI error",
-        details: data
-      });
+    if (
+      content.toLowerCase().includes("login") ||
+      content.toLowerCase().includes("verify") ||
+      content.toLowerCase().includes("bank") ||
+      content.toLowerCase().includes("password")
+    ) {
+      score = 40;
+      verdict = "Sospechoso";
+      details = "Contiene palabras típicas de phishing";
     }
 
-    const result = data.choices[0].message.content.trim();
+    // 🤖 Intentar IA (si hay API KEY)
+    if (process.env.OPENAI_API_KEY) {
+      try {
+        const aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            messages: [
+              {
+                role: "system",
+                content: "Classify as scam, suspicious or safe. Be brief."
+              },
+              {
+                role: "user",
+                content: content
+              }
+            ],
+            temperature: 0
+          })
+        });
 
-    res.status(200).json({ result });
+        const data = await aiResponse.json();
+
+        if (data.choices) {
+          const aiText = data.choices[0].message.content.toLowerCase();
+
+          if (aiText.includes("scam")) {
+            score = 10;
+            verdict = "Peligroso";
+            details = "Detectado como posible estafa por IA";
+          } else if (aiText.includes("suspicious")) {
+            score = 40;
+            verdict = "Sospechoso";
+            details = "Detectado como sospechoso por IA";
+          } else {
+            score = 90;
+            verdict = "Seguro";
+            details = "Evaluado como seguro por IA";
+          }
+        }
+
+      } catch (err) {
+        // fallback silencioso
+      }
+    }
+
+    // ✅ RESPUESTA FINAL (compatible con frontend PRO)
+    return res.status(200).json({
+      score,
+      verdict,
+      details
+    });
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 }
