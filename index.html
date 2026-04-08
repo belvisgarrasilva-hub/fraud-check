@@ -3,12 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Detector de Fraude con IA</title>
+<title>Detector de fraude con IA</title>
 
 <style>
 body {
   background: #f5f7fa;
   margin: 0;
+  font-family: Arial;
 }
 
 .fv-app {
@@ -18,13 +19,11 @@ body {
   background: #fff;
   border-radius: 16px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-  font-family: Arial;
 }
 
 .fv-title {
   font-size: 22px;
   font-weight: bold;
-  margin-bottom: 10px;
 }
 
 .fv-sub {
@@ -39,7 +38,6 @@ body {
   padding: 12px;
   border-radius: 10px;
   border: 1px solid #ddd;
-  resize: none;
 }
 
 .fv-btn {
@@ -50,12 +48,7 @@ body {
   color: #fff;
   border: none;
   border-radius: 10px;
-  font-weight: bold;
   cursor: pointer;
-}
-
-.fv-btn:hover {
-  background: #333;
 }
 
 .fv-result {
@@ -74,28 +67,19 @@ body {
 
 .fv-bar {
   height: 10px;
-  border-radius: 5px;
   background: #eee;
   margin: 15px 0;
-  overflow: hidden;
+  border-radius: 5px;
 }
 
 .fv-bar-fill {
   height: 100%;
   width: 0%;
-  transition: 0.5s;
 }
 
-.safe { color: green; }
-.warning { color: orange; }
-.danger { color: red; }
-
-.fv-history {
-  margin-top: 20px;
-  font-size: 13px;
-  color: #444;
-  text-align: left;
-}
+.seguro { color: green; }
+.advertencia { color: orange; }
+.peligro { color: red; }
 </style>
 </head>
 
@@ -103,13 +87,13 @@ body {
 
 <div class="fv-app">
   <div class="fv-title">🛡 Detector de fraude con IA</div>
-  <div class="fv-sub">Pegá un mensaje, email o enlace sospechoso</div>
+  <div class="fv-sub">Pegá un texto, link o mensaje sospechoso</div>
 
   <textarea class="fv-input" placeholder="Ej: https://paypal-login.com"></textarea>
 
-  <button class="fv-btn" onclick="analizar()">Analizar ahora</button>
+  <button class="fv-btn" onclick="analizar()">Analizar</button>
 
-  <div class="fv-result">
+  <div class="fv-result" id="result">
     <div class="fv-score" id="score">0%</div>
 
     <div class="fv-bar">
@@ -119,17 +103,15 @@ body {
     <div id="veredicto"></div>
     <div id="details"></div>
   </div>
-
-  <div class="fv-history" id="history"></div>
 </div>
 
 <script>
-const API_URL = "https://fraud-check-htdhqrjh3-belvisgarrasilva-hubs-projects.vercel.app/api/analyze";
+const API_URL = "https://fraud-check-psi.vercel.app/api/analyze";
 
 async function analizar() {
-  const text = document.querySelector(".fv-input").value.trim();
+  const texto = document.querySelector(".fv-input").value.trim();
 
-  if (!text) {
+  if (!texto) {
     alert("Pegá algo para analizar");
     return;
   }
@@ -138,14 +120,11 @@ async function analizar() {
     const res = await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text })
+      body: JSON.stringify({ text: texto })
     });
 
     const data = await res.json();
-
-    // ✅ Mostrar resultado
     mostrarResultado(data);
-    guardarHistorial(text, data.score ?? 0, data.details ?? "Análisis básico activo");
 
   } catch (error) {
     mostrarError();
@@ -153,78 +132,39 @@ async function analizar() {
 }
 
 function mostrarResultado(data) {
-  const resultBox = document.querySelector(".fv-result");
+  const result = document.getElementById("result");
   const scoreEl = document.getElementById("score");
   const bar = document.getElementById("barFill");
   const veredicto = document.getElementById("veredicto");
   const details = document.getElementById("details");
 
-  resultBox.style.display = "block";
+  result.style.display = "block";
 
-  let score = data?.score ?? 0;
-  let detailsText = data?.details ?? "Análisis básico activo";
+  let score = data.score ?? 0;
 
   scoreEl.innerText = score + "%";
   bar.style.width = score + "%";
 
   if (score > 70) {
     bar.style.background = "green";
-    veredicto.className = "safe";
     veredicto.innerText = "✔ Seguro";
+    veredicto.className = "seguro";
   } else if (score > 40) {
     bar.style.background = "orange";
-    veredicto.className = "warning";
     veredicto.innerText = "⚠ Sospechoso";
+    veredicto.className = "advertencia";
   } else {
     bar.style.background = "red";
-    veredicto.className = "danger";
     veredicto.innerText = "❌ Peligroso";
+    veredicto.className = "peligro";
   }
 
-  details.innerText = detailsText;
+  details.innerText = data.details || "";
 }
 
 function mostrarError() {
-  const resultBox = document.querySelector(".fv-result");
-  const veredicto = document.getElementById("veredicto");
-  const details = document.getElementById("details");
-  const scoreEl = document.getElementById("score");
-  const bar = document.getElementById("barFill");
-
-  resultBox.style.display = "block";
-  scoreEl.innerText = "0%";
-  bar.style.width = "0%";
-  veredicto.innerText = "❌ Error de conexión con el servidor";
-  veredicto.className = "danger";
-  details.innerText = "El servidor no respondió o la API no está disponible";
+  alert("Error conectando con la API");
 }
-
-function guardarHistorial(text, score, details) {
-  let historial = JSON.parse(localStorage.getItem("historial")) || [];
-
-  historial.unshift({ text, score, details });
-  historial = historial.slice(0, 5);
-
-  localStorage.setItem("historial", JSON.stringify(historial));
-  mostrarHistorial();
-}
-
-function mostrarHistorial() {
-  const historyDiv = document.getElementById("history");
-  let historial = JSON.parse(localStorage.getItem("historial")) || [];
-
-  if(historial.length === 0) { historyDiv.innerHTML = ""; return; }
-
-  historyDiv.innerHTML = "<b>Historial:</b><br>";
-  historial.forEach(item => {
-    historyDiv.innerHTML += `
-      <div>${item.text.substring(0, 30)}... → ${item.score}%</div>
-    `;
-  });
-}
-
-// cargar historial al iniciar
-mostrarHistorial();
 </script>
 
 </body>
