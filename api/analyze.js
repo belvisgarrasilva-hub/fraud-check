@@ -1,4 +1,5 @@
 export default async function handler(req, res) {
+
   // ✅ CORS (para Blogger)
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -16,7 +17,7 @@ export default async function handler(req, res) {
     const { text } = req.body;
 
     if (!text) {
-      return res.status(400).json({ error: "No text" });
+      return res.status(400).json({ error: "No hay texto" });
     }
 
     // 🔍 Detectar URLs
@@ -40,13 +41,43 @@ export default async function handler(req, res) {
       }
     });
 
-    // 🌐 Google Safe Browsing (con protección)
+    // 🌍 DETECCIÓN AVANZADA (SIN API)
+    urls.forEach(url => {
+      try {
+        const domain = new URL(url).hostname;
+
+        if (domain.length > 25) {
+          linkRisk += 15;
+          linkDetails += "⚠️ Dominio demasiado largo. ";
+        }
+
+        if ((domain.match(/-/g) || []).length >= 2) {
+          linkRisk += 20;
+          linkDetails += "⚠️ Dominio con múltiples guiones. ";
+        }
+
+        if (domain.split(".").length > 3) {
+          linkRisk += 20;
+          linkDetails += "⚠️ Subdominios sospechosos. ";
+        }
+
+        const riskyTLDs = [".xyz", ".tk", ".ml", ".ga", ".cf"];
+        if (riskyTLDs.some(tld => domain.endsWith(tld))) {
+          linkRisk += 25;
+          linkDetails += "⚠️ Dominio de alto riesgo. ";
+        }
+
+      } catch {}
+    });
+
+    // 🌐 Google Safe Browsing
     if (urls.length > 0 && process.env.GOOGLE_API_KEY) {
       try {
         const gRes = await fetch(
           `https://safebrowsing.googleapis.com/v4/threatMatches:find?key=${process.env.GOOGLE_API_KEY}`,
           {
             method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               client: { clientId: "app", clientVersion: "1.0" },
               threatInfo: {
@@ -65,12 +96,13 @@ export default async function handler(req, res) {
           linkRisk += 40;
           linkDetails += "🚨 Detectado por Google. ";
         }
-      } catch (e) {
+
+      } catch {
         linkDetails += "Google no disponible. ";
       }
     }
 
-    // 🧠 IA (PROTEGIDA)
+    // 🧠 IA (OpenAI)
     let score = 80;
     let details = "Contenido parece seguro";
 
@@ -109,7 +141,7 @@ export default async function handler(req, res) {
           }
         }
 
-      } catch (e) {
+      } catch {
         details = "IA no disponible";
       }
     }
