@@ -17,6 +17,26 @@ export default async function handler(req, res) {
     let linkRisk = 0;
     let linkDetails = "";
 
+    // 🔥 DETECCIÓN HEURÍSTICA (phishing)
+    if (urls.length > 0) {
+      const suspiciousPatterns = ["login", "verify", "account", "bank", "secure", "update"];
+      const suspiciousDomains = [".xyz", ".ru", ".tk", ".ml", ".ga"];
+
+      urls.forEach(url => {
+        const lowerUrl = url.toLowerCase();
+
+        if (suspiciousPatterns.some(p => lowerUrl.includes(p))) {
+          linkRisk += 20;
+          linkDetails += "⚠️ URL contiene palabras típicas de phishing. ";
+        }
+
+        if (suspiciousDomains.some(d => lowerUrl.includes(d))) {
+          linkRisk += 20;
+          linkDetails += "⚠️ Dominio sospechoso. ";
+        }
+      });
+    }
+
     // 🌐 GOOGLE SAFE BROWSING
     if (urls.length > 0) {
       try {
@@ -42,13 +62,13 @@ export default async function handler(req, res) {
         const data = await response.json();
 
         if (data.matches) {
-          linkRisk = 40;
-          linkDetails = "⚠️ Link peligroso detectado por Google.";
+          linkRisk += 40;
+          linkDetails += "⚠️ Link peligroso detectado por Google. ";
         } else {
-          linkDetails = "✔ Link no reportado como peligroso.";
+          linkDetails += "✔ Link no reportado como peligroso. ";
         }
       } catch {
-        linkDetails = "No se pudo verificar el link.";
+        linkDetails += "No se pudo verificar el link con Google. ";
       }
     }
 
@@ -76,7 +96,7 @@ export default async function handler(req, res) {
 
     const aiData = await aiRes.json();
 
-    // 🔥 BASE INTELIGENTE (evita quedarse en 50)
+    // 🔥 BASE INTELIGENTE
     let score = 70;
     let details = "Contenido aparentemente seguro";
 
@@ -99,11 +119,12 @@ export default async function handler(req, res) {
       }
     }
 
-    // 🔥 Ajuste por links
+    // 🔥 AJUSTE FINAL
     score = Math.max(0, Math.min(100, score - linkRisk));
 
-    if (linkDetails) {
-      details += " | " + linkDetails;
+    // 🔥 COHERENCIA FINAL (evita contradicciones)
+    if (linkRisk > 0) {
+      details = "🚨 Riesgo detectado en el enlace. " + linkDetails;
     }
 
     return res.status(200).json({ score, details });
