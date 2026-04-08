@@ -1,9 +1,14 @@
+const API_KEYS = {
+  "demo123": { limit: 10 },   // plan gratis
+  "pro456": { limit: 9999 }   // plan pro
+};
+
 export default async function handler(req, res) {
 
-  // ✅ CORS (para Blogger)
+  // ✅ CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key");
 
   if (req.method === "OPTIONS") {
     return res.status(200).end();
@@ -14,19 +19,49 @@ export default async function handler(req, res) {
   }
 
   try {
+
+    // 🔐 VALIDAR API KEY
+    const clientKey = req.headers["x-api-key"];
+
+    if (!clientKey || !API_KEYS[clientKey]) {
+      return res.status(403).json({ error: "API Key inválida" });
+    }
+
+    // 📊 CONTROL DE USO
+    if (!global.usage) global.usage = {};
+
+    const today = new Date().toDateString();
+
+    if (!global.usage[clientKey]) {
+      global.usage[clientKey] = { date: today, count: 0 };
+    }
+
+    if (global.usage[clientKey].date !== today) {
+      global.usage[clientKey] = { date: today, count: 0 };
+    }
+
+    if (global.usage[clientKey].count >= API_KEYS[clientKey].limit) {
+      return res.status(429).json({
+        error: "Límite diario alcanzado"
+      });
+    }
+
+    global.usage[clientKey].count++;
+
+    // 🧠 INPUT
     const { text } = req.body;
 
     if (!text) {
       return res.status(400).json({ error: "No hay texto" });
     }
 
-    // 🔍 Detectar URLs
+    // 🔍 DETECTAR URLs
     const urls = text.match(/https?:\/\/[^\s]+/g) || [];
 
     let linkRisk = 0;
     let linkDetails = "";
 
-    // 🔥 Heurística básica
+    // 🔥 HEURÍSTICA BÁSICA
     urls.forEach(url => {
       const lower = url.toLowerCase();
 
@@ -41,7 +76,7 @@ export default async function handler(req, res) {
       }
     });
 
-    // 🌍 DETECCIÓN AVANZADA (SIN API)
+    // 🌍 DETECCIÓN AVANZADA SIN API
     urls.forEach(url => {
       try {
         const domain = new URL(url).hostname;
@@ -53,7 +88,7 @@ export default async function handler(req, res) {
 
         if ((domain.match(/-/g) || []).length >= 2) {
           linkRisk += 20;
-          linkDetails += "⚠️ Dominio con múltiples guiones. ";
+          linkDetails += "⚠️ Múltiples guiones (phishing). ";
         }
 
         if (domain.split(".").length > 3) {
@@ -70,7 +105,7 @@ export default async function handler(req, res) {
       } catch {}
     });
 
-    // 🌐 Google Safe Browsing
+    // 🌐 GOOGLE SAFE BROWSING
     if (urls.length > 0 && process.env.GOOGLE_API_KEY) {
       try {
         const gRes = await fetch(
@@ -102,7 +137,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // 🧠 IA (OpenAI)
+    // 🤖 IA
     let score = 80;
     let details = "Contenido parece seguro";
 
@@ -146,7 +181,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // 🔥 Ajuste final
+    // 🔥 AJUSTE FINAL
     score = Math.max(0, Math.min(100, score - linkRisk));
 
     if (linkRisk > 0) {
