@@ -1,94 +1,46 @@
-export default async function handler(req, res) {
+let baseScore = 90;
+let score = baseScore;
+let details = "Contenido parece seguro";
 
-  // ✅ CORS
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key");
+const safeText = (text || "").toLowerCase();
+const urls = safeText.match(/https?:\/\/[^\s]+/g) || [];
 
-  if (req.method === "OPTIONS") return res.status(200).end();
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Use POST" });
+let linkRisk = 0;
+
+if (urls.length > 0) {
+  urls.forEach(url => {
+    let risk = 0;
+
+    // palabras sensibles
+    if (/(login|verify|bank)/.test(url)) {
+      risk += 20;
+    }
+
+    // dominios sospechosos
+    if (/(\.xyz|\.ru)/.test(url)) {
+      risk += 30;
+    }
+
+    // limitar riesgo por URL individual
+    linkRisk += Math.min(risk, 40);
+  });
+
+  if (linkRisk > 0) {
+    details = "⚠️ Posible fraude detectado en enlaces";
   }
+}
 
-  try {
-    const apiKey = req.headers["x-api-key"];
-    const { text } = req.body;
+// 🔒 límite global
+linkRisk = Math.min(linkRisk, 60);
 
-    if (!apiKey) {
-      return res.status(403).json({ error: "API key requerida" });
-    }
+// 🔥 cálculo final
+score = baseScore - linkRisk;
 
-    // 🔗 CONSULTAR USUARIO EN SUPABASE
-    const userRes = await fetch(
-      `https://iwgvqgidsucupxsfxndg.supabase.co/rest/v1/users?api_key=eq.${apiKey}`,
-      {
-        headers: {
-          "apikey": process.env.SUPABASE_KEY,
-          "Authorization": `Bearer ${process.env.SUPABASE_KEY}`
-        }
-      }
-    );
+// 🛡️ evitar extremos raros
+score = Math.max(30, Math.min(100, score));
 
-    const users = await userRes.json();
-
-    if (!users || users.length === 0) {
-      return res.status(403).json({ error: "API key inválida" });
-    }
-
-    const user = users[0];
-
-    // 🚫 LÍMITE DE USO
-    if (user.used_count >= user.limit_count) {
-      return res.status(403).json({ error: "Límite alcanzado — pasá a PRO" });
-    }
-
-    // 🔄 ACTUALIZAR USO
-    await fetch(
-      `https://iwgvqgidsucupxsfxndg.supabase.co/rest/v1/users?api_key=eq.${apiKey}`,
-      {
-        method: "PATCH",
-        headers: {
-          "apikey": process.env.SUPABASE_KEY,
-          "Authorization": `Bearer ${process.env.SUPABASE_KEY}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          used_count: user.used_count + 1
-        })
-      }
-    );
-
-    // 🧠 DETECCIÓN BÁSICA (puede convivir con IA)
-    let score = 80;
-    let details = "Contenido parece seguro";
-
-    // 🔍 detectar URLs
-    const urls = text.match(/https?:\/\/[^\s]+/g) || [];
-    let linkRisk = 0;
-
-    urls.forEach(url => {
-      const lower = url.toLowerCase();
-
-      if (["login", "verify", "bank"].some(w => lower.includes(w))) {
-        linkRisk += 20;
-      }
-
-      if ([".xyz", ".ru"].some(d => lower.includes(d))) {
-        linkRisk += 20;
-      }
-    });
-
-    score = Math.max(0, Math.min(100, score - linkRisk));
-
-    if (linkRisk > 0) {
-      details = "⚠️ Posible fraude detectado en enlaces";
-    }
-
-    return res.status(200).json({ score, details });
-
-  } catch (error) {
-    return res.status(500).json({
-      error: "Error interno",
-      details: error.message
-    });
-  }
+// 🧠 fallback extra (por si algo raro pasa)
+if (isNaN(score)) {
+  score = 50;
+  details = "Error en análisis";
 }
