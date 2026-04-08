@@ -17,7 +17,7 @@ export default async function handler(req, res) {
     let linkRisk = 0;
     let linkDetails = "";
 
-    // 🔥 DETECCIÓN HEURÍSTICA (phishing básico)
+    // 🔥 DETECCIÓN HEURÍSTICA
     if (urls.length > 0) {
       const suspiciousPatterns = ["login", "verify", "account", "bank", "secure", "update"];
       const suspiciousDomains = [".xyz", ".ru", ".tk", ".ml", ".ga"];
@@ -37,25 +37,30 @@ export default async function handler(req, res) {
       });
     }
 
-    // 🔐 DETECTOR DE CLONES (phishing avanzado)
-    const knownBrands = ["paypal", "google", "facebook", "instagram", "bank", "apple"];
+    // 🔐 DETECTOR DE CLONES (MEJORADO)
+    const knownBrands = ["paypal", "google", "facebook", "instagram", "apple", "bank"];
 
-    function normalizeDomain(url) {
-      return url
+    function normalize(text) {
+      return text
         .toLowerCase()
         .replace(/0/g, "o")
         .replace(/1/g, "l")
         .replace(/3/g, "e")
-        .replace(/@/g, "a");
+        .replace(/@/g, "a")
+        .replace(/!/g, "i");
     }
 
     urls.forEach(url => {
-      const normalized = normalizeDomain(url);
+      const lowerUrl = url.toLowerCase();
+      const normalized = normalize(lowerUrl);
 
       knownBrands.forEach(brand => {
-        if (normalized.includes(brand) && !url.toLowerCase().includes(brand)) {
-          linkRisk += 30;
-          linkDetails += `⚠️ Posible suplantación de ${brand}. `;
+        if (
+          normalized.includes(brand) &&
+          !lowerUrl.includes(brand)
+        ) {
+          linkRisk += 40;
+          linkDetails += `🚨 Posible suplantación de ${brand}. `;
         }
       });
     });
@@ -119,40 +124,4 @@ export default async function handler(req, res) {
 
     const aiData = await aiRes.json();
 
-    // 🔥 BASE INTELIGENTE
-    let score = 70;
-    let details = "Contenido aparentemente seguro";
-
-    try {
-      const parsed = JSON.parse(aiData.choices[0].message.content);
-      score = parsed.score;
-      details = parsed.details;
-    } catch {
-      const aiText = aiData.choices?.[0]?.message?.content || "";
-
-      if (aiText.toLowerCase().includes("fraude") || aiText.toLowerCase().includes("phishing")) {
-        score = 30;
-        details = "La IA detecta posible fraude";
-      } else if (aiText.toLowerCase().includes("falso") || aiText.toLowerCase().includes("engañoso")) {
-        score = 40;
-        details = "Contenido posiblemente engañoso";
-      } else {
-        score = 80;
-        details = "Contenido parece seguro";
-      }
-    }
-
-    // 🔥 AJUSTE FINAL
-    score = Math.max(0, Math.min(100, score - linkRisk));
-
-    // 🔥 MENSAJE FINAL COHERENTE
-    if (linkRisk > 0) {
-      details = "🚨 Riesgo detectado en el enlace. " + linkDetails;
-    }
-
-    return res.status(200).json({ score, details });
-
-  } catch (error) {
-    return res.status(500).json({ error: "Error en análisis avanzado" });
-  }
-}
+    // 🔥 BASE
