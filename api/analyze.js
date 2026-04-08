@@ -17,7 +17,7 @@ export default async function handler(req, res) {
     let linkRisk = 0;
     let linkDetails = "";
 
-    // 🔥 DETECCIÓN HEURÍSTICA (phishing)
+    // 🔥 DETECCIÓN HEURÍSTICA (phishing básico)
     if (urls.length > 0) {
       const suspiciousPatterns = ["login", "verify", "account", "bank", "secure", "update"];
       const suspiciousDomains = [".xyz", ".ru", ".tk", ".ml", ".ga"];
@@ -36,6 +36,29 @@ export default async function handler(req, res) {
         }
       });
     }
+
+    // 🔐 DETECTOR DE CLONES (phishing avanzado)
+    const knownBrands = ["paypal", "google", "facebook", "instagram", "bank", "apple"];
+
+    function normalizeDomain(url) {
+      return url
+        .toLowerCase()
+        .replace(/0/g, "o")
+        .replace(/1/g, "l")
+        .replace(/3/g, "e")
+        .replace(/@/g, "a");
+    }
+
+    urls.forEach(url => {
+      const normalized = normalizeDomain(url);
+
+      knownBrands.forEach(brand => {
+        if (normalized.includes(brand) && !url.toLowerCase().includes(brand)) {
+          linkRisk += 30;
+          linkDetails += `⚠️ Posible suplantación de ${brand}. `;
+        }
+      });
+    });
 
     // 🌐 GOOGLE SAFE BROWSING
     if (urls.length > 0) {
@@ -122,7 +145,7 @@ export default async function handler(req, res) {
     // 🔥 AJUSTE FINAL
     score = Math.max(0, Math.min(100, score - linkRisk));
 
-    // 🔥 COHERENCIA FINAL (evita contradicciones)
+    // 🔥 MENSAJE FINAL COHERENTE
     if (linkRisk > 0) {
       details = "🚨 Riesgo detectado en el enlace. " + linkDetails;
     }
