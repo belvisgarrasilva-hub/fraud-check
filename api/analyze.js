@@ -12,7 +12,7 @@ if (urls.length > 0) {
     let risk = 0;
 
     // palabras sensibles
-    if (/(login|verify|bank)/.test(url)) {
+    if (/(login|verify|bank|verificar|banco|cuenta|acceso)/.test(url)) {
       risk += 20;
     }
 
@@ -21,7 +21,7 @@ if (urls.length > 0) {
       risk += 30;
     }
 
-    // limitar riesgo por URL individual
+    // limitar riesgo por URL
     linkRisk += Math.min(risk, 40);
   });
 
@@ -30,16 +30,16 @@ if (urls.length > 0) {
   }
 }
 
-// 🔒 límite global
+// límite global
 linkRisk = Math.min(linkRisk, 60);
 
-// 🔥 cálculo final
+// cálculo final
 score = baseScore - linkRisk;
 
-// 🛡️ evitar extremos raros
+// evitar extremos
 score = Math.max(30, Math.min(100, score));
 
-// 🧠 fallback extra (por si algo raro pasa)
+// fallback
 if (isNaN(score)) {
   score = 50;
   details = "Error en análisis";
