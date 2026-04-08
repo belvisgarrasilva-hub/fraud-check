@@ -1,4 +1,13 @@
 export default async function handler(req, res) {
+  // ✅ CORS (para Blogger)
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Use POST" });
   }
@@ -6,122 +15,118 @@ export default async function handler(req, res) {
   try {
     const { text } = req.body;
 
-    if (!text || text.trim() === "") {
+    if (!text) {
       return res.status(400).json({ error: "No text" });
     }
 
     // 🔍 Detectar URLs
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    const urls = text.match(urlRegex) || [];
+    const urls = text.match(/https?:\/\/[^\s]+/g) || [];
 
     let linkRisk = 0;
     let linkDetails = "";
 
-    // 🔥 DETECCIÓN HEURÍSTICA
-    if (urls.length > 0) {
-      const suspiciousPatterns = ["login", "verify", "account", "bank", "secure", "update"];
-      const suspiciousDomains = [".xyz", ".ru", ".tk", ".ml", ".ga"];
-
-      urls.forEach(url => {
-        const lowerUrl = url.toLowerCase();
-
-        if (suspiciousPatterns.some(p => lowerUrl.includes(p))) {
-          linkRisk += 20;
-          linkDetails += "⚠️ URL contiene palabras típicas de phishing. ";
-        }
-
-        if (suspiciousDomains.some(d => lowerUrl.includes(d))) {
-          linkRisk += 20;
-          linkDetails += "⚠️ Dominio sospechoso. ";
-        }
-      });
-    }
-
-    // 🔐 DETECTOR DE CLONES (MEJORADO)
-    const knownBrands = ["paypal", "google", "facebook", "instagram", "apple", "bank"];
-
-    function normalize(text) {
-      return text
-        .toLowerCase()
-        .replace(/0/g, "o")
-        .replace(/1/g, "l")
-        .replace(/3/g, "e")
-        .replace(/@/g, "a")
-        .replace(/!/g, "i");
-    }
-
+    // 🔥 Heurística básica
     urls.forEach(url => {
-      const lowerUrl = url.toLowerCase();
-      const normalized = normalize(lowerUrl);
+      const lower = url.toLowerCase();
 
-      knownBrands.forEach(brand => {
-        if (
-          normalized.includes(brand) &&
-          !lowerUrl.includes(brand)
-        ) {
-          linkRisk += 40;
-          linkDetails += `🚨 Posible suplantación de ${brand}. `;
-        }
-      });
+      if (["login", "verify", "bank"].some(w => lower.includes(w))) {
+        linkRisk += 20;
+        linkDetails += "⚠️ Posible phishing. ";
+      }
+
+      if ([".xyz", ".ru"].some(d => lower.includes(d))) {
+        linkRisk += 20;
+        linkDetails += "⚠️ Dominio sospechoso. ";
+      }
     });
 
-    // 🌐 GOOGLE SAFE BROWSING
-    if (urls.length > 0) {
+    // 🌐 Google Safe Browsing (con protección)
+    if (urls.length > 0 && process.env.GOOGLE_API_KEY) {
       try {
-        const response = await fetch(
+        const gRes = await fetch(
           `https://safebrowsing.googleapis.com/v4/threatMatches:find?key=${process.env.GOOGLE_API_KEY}`,
           {
             method: "POST",
             body: JSON.stringify({
-              client: {
-                clientId: "fraud-check",
-                clientVersion: "1.0"
-              },
+              client: { clientId: "app", clientVersion: "1.0" },
               threatInfo: {
                 threatTypes: ["MALWARE", "SOCIAL_ENGINEERING"],
                 platformTypes: ["ANY_PLATFORM"],
                 threatEntryTypes: ["URL"],
-                threatEntries: urls.map(url => ({ url }))
+                threatEntries: urls.map(u => ({ url: u }))
               }
             })
           }
         );
 
-        const data = await response.json();
+        const gData = await gRes.json();
 
-        if (data.matches) {
+        if (gData.matches) {
           linkRisk += 40;
-          linkDetails += "⚠️ Link peligroso detectado por Google. ";
-        } else {
-          linkDetails += "✔ Link no reportado como peligroso. ";
+          linkDetails += "🚨 Detectado por Google. ";
         }
-      } catch {
-        linkDetails += "No se pudo verificar el link con Google. ";
+      } catch (e) {
+        linkDetails += "Google no disponible. ";
       }
     }
 
-    // 🧠 IA (OpenAI)
-    const aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: "Respondé SOLO en JSON válido con este formato exacto: {\"score\": number, \"details\": \"texto corto\"}"
+    // 🧠 IA (PROTEGIDA)
+    let score = 80;
+    let details = "Contenido parece seguro";
+
+    if (process.env.OPENAI_API_KEY) {
+      try {
+        const aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+            "Content-Type": "application/json"
           },
-          {
-            role: "user",
-            content: `Analizá este contenido y determiná si es fraude, phishing o fake news: "${text}"`
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            messages: [
+              {
+                role: "system",
+                content: "Respondé SOLO JSON: {\"score\": number, \"details\": \"texto\"}"
+              },
+              {
+                role: "user",
+                content: text
+              }
+            ]
+          })
+        });
+
+        const aiData = await aiRes.json();
+
+        if (aiData.choices) {
+          try {
+            const parsed = JSON.parse(aiData.choices[0].message.content);
+            score = parsed.score;
+            details = parsed.details;
+          } catch {
+            details = "Análisis IA parcial";
           }
-        ]
-      })
+        }
+
+      } catch (e) {
+        details = "IA no disponible";
+      }
+    }
+
+    // 🔥 Ajuste final
+    score = Math.max(0, Math.min(100, score - linkRisk));
+
+    if (linkRisk > 0) {
+      details = "🚨 Riesgo detectado. " + linkDetails;
+    }
+
+    return res.status(200).json({ score, details });
+
+  } catch (error) {
+    return res.status(200).json({
+      score: 50,
+      details: "Error interno controlado"
     });
-
-    const aiData = await aiRes.json();
-
-    // 🔥 BASE
+  }
+}
