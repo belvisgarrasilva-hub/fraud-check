@@ -1,70 +1,97 @@
-// 🧠 normalizar
-const safeText = (text || "")
-  .toLowerCase()
-  .normalize("NFD")
-  .replace(/[\u0300-\u036f]/g, "")
-  .replace(/\s+/g, " ")
-  .trim();
+export default function handler(req, res) {
+  // 🌐 CORS
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-const urls = safeText.match(/https?:\/\/[^\s]+/g) || [];
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
 
-let risk = 0;
-let details = "Contenido parece seguro";
+  try {
+    const { text } = req.body || {};
 
-// 🧠 1. URGENCIA
-const urgency = /(urgente|ahora|inmediato|ya|rapido)/.test(safeText);
+    let details = "Contenido parece seguro";
 
-// 🎯 2. ACCIÓN
-const action = /(verifica|verificar|confirmar|accede|acceso|login)/.test(safeText);
+    // 🧠 normalizar
+    const safeText = (text || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
 
-// 🏦 3. ENTIDAD
-const entity = /(banco|cuenta|paypal|soporte|admin|security)/.test(safeText);
+    const urls = safeText.match(/https?:\/\/[^\s]+/g) || [];
 
-// 🔥 COMBO PELIGROSO (PHISHING REAL)
-if (urgency && action && entity) {
-  risk += 40;
-  details = "🚨 Mensaje con patrón de phishing (urgencia + acción + entidad)";
-}
+    let risk = 0;
 
-// combinaciones parciales
-if (urgency && action) risk += 15;
-if (action && entity) risk += 15;
+    // 🧠 URGENCIA
+    const urgency = /(urgente|ahora|inmediato|ya|rapido)/.test(safeText);
 
-// 🔗 LINKS
-if (urls.length > 0) {
-  urls.forEach(url => {
-    let linkRisk = 0;
+    // 🎯 ACCIÓN
+    const action = /(verifica|verificar|confirmar|accede|acceso|login)/.test(safeText);
 
-    const badDomain = /(\.xyz|\.ru|bit\.ly|tinyurl)/.test(url);
-    const keywords = /(login|verify|bank)/.test(url);
+    // 🏦 ENTIDAD
+    const entity = /(banco|cuenta|paypal|soporte|admin|security)/.test(safeText);
 
-    if (badDomain) linkRisk += 30;
-    if (keywords) linkRisk += 20;
+    // 🔥 COMBO FUERTE
+    if (urgency && action && entity) {
+      risk += 40;
+      details = "🚨 Patrón de phishing detectado";
+    }
 
-    // 🔥 combo link peligroso
-    if (badDomain && keywords) linkRisk += 20;
+    // combinaciones parciales
+    if (urgency && action) risk += 15;
+    if (action && entity) risk += 15;
 
-    risk += Math.min(linkRisk, 50);
-  });
+    // 🔗 LINKS
+    if (urls.length > 0) {
+      urls.forEach(url => {
+        let linkRisk = 0;
 
-  details = "⚠️ Enlaces sospechosos detectados";
-}
+        const badDomain = /(\.xyz|\.ru|bit\.ly|tinyurl)/.test(url);
+        const keywords = /(login|verify|bank)/.test(url);
 
-// 🔥 muchos links
-if (urls.length > 2) {
-  risk += 10;
-}
+        if (badDomain) linkRisk += 30;
+        if (keywords) linkRisk += 20;
 
-// 🔒 limitar riesgo
-risk = Math.min(risk, 70);
+        // 🔥 combo link
+        if (badDomain && keywords) linkRisk += 20;
 
-// 🎯 score final
-let score = 90 - risk;
+        risk += Math.min(linkRisk, 50);
+      });
 
-// límites
-score = Math.max(30, Math.min(100, score));
+      details = "⚠️ Enlaces sospechosos detectados";
+    }
 
-if (isNaN(score)) {
-  score = 50;
-  details = "Error en análisis";
+    // muchos links
+    if (urls.length > 2) {
+      risk += 10;
+    }
+
+    // 🔒 límite
+    risk = Math.min(risk, 70);
+
+    // 🎯 score
+    let score = 90 - risk;
+
+    score = Math.max(30, Math.min(100, score));
+
+    if (isNaN(score)) {
+      score = 50;
+      details = "Error en análisis";
+    }
+
+    return res.status(200).json({
+      score,
+      details
+    });
+
+  } catch (error) {
+    console.error("API ERROR:", error);
+
+    return res.status(500).json({
+      error: "Internal server error"
+    });
+  }
 }
