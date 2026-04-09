@@ -1,10 +1,17 @@
-export default function handler(req, res) {
-  // 🔓 CORS (para Blogger y cualquier web)
+import { createClient } from '@supabase/supabase-js';
+
+// 🔐 conectar Supabase (usa variables de entorno en Vercel)
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+);
+
+export default async function handler(req, res) {
+  // 🌐 CORS (para Blogger y cualquier web)
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  // 🛑 manejar preflight
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
@@ -16,12 +23,12 @@ export default function handler(req, res) {
     let score = baseScore;
     let details = "Contenido parece seguro";
 
-    // 🧠 normalización (CLAVE)
+    // 🧠 normalizar texto
     const safeText = (text || "")
       .toLowerCase()
       .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "") // quita acentos
-      .replace(/\s+/g, " ") // limpia espacios
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, " ")
       .trim();
 
     // 🔗 detectar URLs
@@ -29,7 +36,7 @@ export default function handler(req, res) {
 
     let linkRisk = 0;
 
-    // 🚨 1. DETECCIÓN POR TEXTO (NUEVO)
+    // 🚨 1. DETECCIÓN POR TEXTO
     if (/(verifica|verificar|urgente|inmediato|banco|cuenta|acceso|suspendida|bloqueada)/.test(safeText)) {
       linkRisk += 20;
     }
@@ -65,13 +72,26 @@ export default function handler(req, res) {
     // 🔥 score final
     score = baseScore - linkRisk;
 
-    // 🛡️ límites
+    // 🛡️ evitar extremos
     score = Math.max(30, Math.min(100, score));
 
     // fallback
     if (isNaN(score)) {
       score = 50;
       details = "Error en análisis";
+    }
+
+    // 💾 guardar en Supabase (NO rompe si falla)
+    try {
+      await supabase.from("analisis").insert([
+        {
+          texto: safeText,
+          score: score,
+          fecha: new Date()
+        }
+      ]);
+    } catch (e) {
+      console.log("Supabase error (no crítico)");
     }
 
     return res.status(200).json({
