@@ -8,7 +8,7 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  // ✅ Test rápido desde navegador
+  // ✅ Test desde navegador
   if (req.method === "GET") {
     return res.status(200).json({
       ok: true,
@@ -34,6 +34,7 @@ export default async function handler(req, res) {
     const urls = safeText.match(/https?:\/\/[^\s]+/g) || [];
 
     let risk = 0;
+    let reasons = [];
 
     // 🧠 Patrones base
     const urgency = /(urgente|ahora|inmediato|ya|rapido)/.test(safeText);
@@ -42,29 +43,37 @@ export default async function handler(req, res) {
 
     if (urgency && action && entity) {
       risk += 40;
+      reasons.push("patrón típico de phishing");
     }
 
-    if (urgency && action) risk += 15;
-    if (action && entity) risk += 15;
+    if (urgency && action) {
+      risk += 15;
+      reasons.push("mensaje urgente con acción");
+    }
+
+    if (action && entity) {
+      risk += 15;
+      reasons.push("solicita acceso a cuenta");
+    }
 
     // 🔥 NUEVOS PATRONES
 
-    // presión / amenaza
     const pressure = /(ultimo aviso|cuenta sera suspendida|bloqueada|accion requerida)/.test(safeText);
     if (pressure) {
       risk += 20;
+      reasons.push("genera presión o amenaza");
     }
 
-    // suplantación
     const impersonation = /(soporte tecnico|equipo de seguridad|atencion al cliente)/.test(safeText);
     if (impersonation) {
       risk += 15;
+      reasons.push("posible suplantación de identidad");
     }
 
-    // premios falsos
     const reward = /(ganaste|premio|dinero gratis|felicitaciones)/.test(safeText);
     if (reward) {
       risk += 20;
+      reasons.push("promesa de recompensa sospechosa");
     }
 
     // 🔗 LINKS + GOOGLE SAFE BROWSING
@@ -75,16 +84,30 @@ export default async function handler(req, res) {
         const badDomain = /(\.xyz|\.ru|bit\.ly|tinyurl)/.test(url);
         const keywords = /(login|verify|bank)/.test(url);
 
-        if (badDomain) linkRisk += 30;
-        if (keywords) linkRisk += 20;
-        if (badDomain && keywords) linkRisk += 20;
+        if (badDomain) {
+          linkRisk += 30;
+          reasons.push("dominio sospechoso");
+        }
 
-        // dominio raro
+        if (keywords) {
+          linkRisk += 20;
+          reasons.push("link con palabras sensibles");
+        }
+
+        if (badDomain && keywords) {
+          linkRisk += 20;
+        }
+
         const weirdDomain = /[-]{2,}|\d{3,}/.test(url);
-        if (weirdDomain) linkRisk += 15;
+        if (weirdDomain) {
+          linkRisk += 15;
+          reasons.push("estructura de dominio extraña");
+        }
 
-        // URL demasiado larga
-        if (url.length > 60) linkRisk += 10;
+        if (url.length > 60) {
+          linkRisk += 10;
+          reasons.push("URL demasiado larga");
+        }
 
         // 🛡️ Google Safe Browsing
         try {
@@ -124,6 +147,7 @@ export default async function handler(req, res) {
 
           if (googleData.matches) {
             linkRisk += 70;
+            reasons.push("Google detectó enlace peligroso");
           }
 
         } catch (e) {
@@ -134,30 +158,31 @@ export default async function handler(req, res) {
       }
     }
 
-    // muchos links
     if (urls.length > 2) {
       risk += 10;
+      reasons.push("múltiples enlaces");
     }
 
     // 🔒 límite
     risk = Math.min(risk, 100);
 
-    // 🎯 SCORE MEJORADO
+    // 🎯 SCORE
     let score = 100 - risk;
     score = Math.max(10, Math.min(100, score));
 
     // 📊 MENSAJE FINAL
     if (score < 40) {
-      details = "❌ Alto riesgo de fraude";
+      details = "❌ Alto riesgo: " + (reasons.join(", ") || "posible fraude");
     } else if (score < 70) {
-      details = "⚠️ Contenido sospechoso";
+      details = "⚠️ Sospechoso: " + (reasons.join(", ") || "revisar contenido");
     } else {
       details = "✔️ Probablemente seguro";
     }
 
     return res.status(200).json({
       score,
-      details
+      details,
+      reasons
     });
 
   } catch (error) {
