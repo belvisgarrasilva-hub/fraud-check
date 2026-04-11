@@ -8,7 +8,7 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  // ✅ TEST DESDE NAVEGADOR
+  // ✅ Test rápido desde navegador
   if (req.method === "GET") {
     return res.status(200).json({
       ok: true,
@@ -23,7 +23,7 @@ export default async function handler(req, res) {
 
     let details = "Contenido parece seguro";
 
-    // 🧠 normalizar
+    // 🧠 Normalizar texto
     const safeText = text
       .toLowerCase()
       .normalize("NFD")
@@ -35,25 +35,39 @@ export default async function handler(req, res) {
 
     let risk = 0;
 
-    // 🧠 URGENCIA
+    // 🧠 Patrones base
     const urgency = /(urgente|ahora|inmediato|ya|rapido)/.test(safeText);
-
-    // 🎯 ACCIÓN
     const action = /(verifica|verificar|confirmar|accede|acceso|login)/.test(safeText);
-
-    // 🏦 ENTIDAD
     const entity = /(banco|cuenta|paypal|soporte|admin|security)/.test(safeText);
 
-    // 🔥 COMBO FUERTE
     if (urgency && action && entity) {
       risk += 40;
-      details = "🚨 Patrón de phishing detectado";
     }
 
     if (urgency && action) risk += 15;
     if (action && entity) risk += 15;
 
-    // 🔗 LINKS + GOOGLE
+    // 🔥 NUEVOS PATRONES
+
+    // presión / amenaza
+    const pressure = /(ultimo aviso|cuenta sera suspendida|bloqueada|accion requerida)/.test(safeText);
+    if (pressure) {
+      risk += 20;
+    }
+
+    // suplantación
+    const impersonation = /(soporte tecnico|equipo de seguridad|atencion al cliente)/.test(safeText);
+    if (impersonation) {
+      risk += 15;
+    }
+
+    // premios falsos
+    const reward = /(ganaste|premio|dinero gratis|felicitaciones)/.test(safeText);
+    if (reward) {
+      risk += 20;
+    }
+
+    // 🔗 LINKS + GOOGLE SAFE BROWSING
     if (urls.length > 0) {
       for (const url of urls) {
         let linkRisk = 0;
@@ -64,6 +78,13 @@ export default async function handler(req, res) {
         if (badDomain) linkRisk += 30;
         if (keywords) linkRisk += 20;
         if (badDomain && keywords) linkRisk += 20;
+
+        // dominio raro
+        const weirdDomain = /[-]{2,}|\d{3,}/.test(url);
+        if (weirdDomain) linkRisk += 15;
+
+        // URL demasiado larga
+        if (url.length > 60) linkRisk += 10;
 
         // 🛡️ Google Safe Browsing
         try {
@@ -103,7 +124,6 @@ export default async function handler(req, res) {
 
           if (googleData.matches) {
             linkRisk += 70;
-            details = "🚨 Google detectó este enlace como peligroso";
           }
 
         } catch (e) {
@@ -112,8 +132,6 @@ export default async function handler(req, res) {
 
         risk += Math.min(linkRisk, 70);
       }
-
-      details = "⚠️ Enlaces analizados con IA y Google";
     }
 
     // muchos links
@@ -122,15 +140,19 @@ export default async function handler(req, res) {
     }
 
     // 🔒 límite
-    risk = Math.min(risk, 70);
+    risk = Math.min(risk, 100);
 
-    // 🎯 score
-    let score = 90 - risk;
-    score = Math.max(30, Math.min(100, score));
+    // 🎯 SCORE MEJORADO
+    let score = 100 - risk;
+    score = Math.max(10, Math.min(100, score));
 
-    if (isNaN(score)) {
-      score = 50;
-      details = "Error en análisis";
+    // 📊 MENSAJE FINAL
+    if (score < 40) {
+      details = "❌ Alto riesgo de fraude";
+    } else if (score < 70) {
+      details = "⚠️ Contenido sospechoso";
+    } else {
+      details = "✔️ Probablemente seguro";
     }
 
     return res.status(200).json({
@@ -142,8 +164,7 @@ export default async function handler(req, res) {
     console.error("API ERROR:", error);
 
     return res.status(500).json({
-      error: error.message,
-      stack: error.stack
+      error: error.message
     });
   }
 }
